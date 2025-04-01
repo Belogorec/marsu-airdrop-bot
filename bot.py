@@ -1,4 +1,3 @@
-
 import os
 import logging
 from aiogram import Bot, Dispatcher, executor, types
@@ -18,11 +17,18 @@ if not os.path.exists(CSV_FILE):
         writer.writerow(['user_id', 'username', 'wallet'])
 
 async def is_subscribed(user_id):
-    member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-    return member.status in ['member', 'administrator', 'creator']
+    try:
+        member = await bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        return member.status in ['member', 'administrator', 'creator']
+    except Exception as e:
+        logging.warning(f"Subscription check failed: {e}")
+        return False
 
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
+    if message.chat.type != 'private':
+        return  # Ignore messages from groups or channels
+
     user_id = message.from_user.id
     username = message.from_user.username
 
@@ -41,7 +47,7 @@ async def send_welcome(message: types.Message):
 
     await message.answer("Ты успешно зарегистрирован! Теперь пришли свой SOLANA-кошелёк (только один раз).")
 
-@dp.message_handler(lambda message: message.text.startswith('5') and len(message.text.strip()) > 20)
+@dp.message_handler(lambda message: message.chat.type == 'private' and message.text.startswith('5') and len(message.text.strip()) > 20)
 async def save_wallet(message: types.Message):
     user_id = message.from_user.id
     wallet = message.text.strip()
@@ -66,6 +72,9 @@ async def save_wallet(message: types.Message):
 
 @dp.message_handler(commands=['status'])
 async def status(message: types.Message):
+    if message.chat.type != 'private':
+        return
+
     user_id = str(message.from_user.id)
     with open(CSV_FILE, 'r') as f:
         reader = csv.reader(f)
